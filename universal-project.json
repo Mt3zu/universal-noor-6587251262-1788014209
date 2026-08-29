@@ -1,0 +1,1 @@
+{"name": "noor", "type": "source-viewer", "files": ["requirements.txt", ".gitignore", "train.py", "README.md", "tokenizer.py", "seora/model.py", "seora/config.py", "seora/__init__.py", "data/train.txt", "api/server.py", "api/__init__.py"]}

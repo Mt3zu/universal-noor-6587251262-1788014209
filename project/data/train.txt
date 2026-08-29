@@ -1,0 +1,3 @@
+SeoraAI is a trainable language model.
+It learns from data and generates the next tokens.
+Python, PHP, JavaScript and Arabic text can be included in a larger curated dataset.

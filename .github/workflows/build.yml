@@ -1,0 +1,54 @@
+name: Universal ZIP APK
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Build
+        shell: bash
+        run: |
+          set -euo pipefail
+          TYPE="source-viewer"
+          if [ "$TYPE" = "android-gradle" ]; then
+            if [ -f project/gradlew ]; then chmod +x project/gradlew; (cd project && ./gradlew assembleDebug --no-daemon); else (cd project && gradle assembleDebug --no-daemon); fi
+            APK=$(find project -type f -path '*/build/outputs/apk/*/*.apk' | head -n1); test -n "$APK"; mkdir -p out; cp "$APK" out/app.apk
+          elif [ "$TYPE" = "flutter" ]; then
+            git clone --depth 1 https://github.com/flutter/flutter.git -b stable /opt/flutter
+            export PATH="/opt/flutter/bin:$PATH"
+            flutter config --no-analytics
+            (cd project && flutter pub get && flutter build apk --debug)
+            APK=$(find project/build/app/outputs/flutter-apk -type f -name '*.apk' | head -n1); test -n "$APK"; mkdir -p out; cp "$APK" out/app.apk
+          elif [ "$TYPE" = "web-cordova" ]; then
+            npm install -g cordova
+            cordova create app com.noor.universal "noor"
+            cd app; cordova platform add android; rm -rf www/*; cp -a ../project/. www/; test -f www/index.html; cordova build android --debug
+            mkdir -p ../out; cp platforms/android/app/build/outputs/apk/debug/*.apk ../out/app.apk
+          elif [ "$TYPE" = "react-node" ]; then
+            if [ -f project/package-lock.json ]; then npm --prefix project ci; else npm --prefix project install; fi
+            if node -e "const p=require('./project/package.json');process.exit(p.scripts&&p.scripts.build?0:1)"; then npm --prefix project run build; fi
+            if [ -f project/dist/index.html ] || [ -f project/build/index.html ]; then
+              npm install -g cordova; cordova create app com.noor.universal "noor"; cd app; cordova platform add android; rm -rf www/*
+              if [ -d ../project/dist ]; then cp -a ../project/dist/. www/; else cp -a ../project/build/. www/; fi
+              test -f www/index.html; cordova build android --debug; mkdir -p ../out; cp platforms/android/app/build/outputs/apk/debug/*.apk ../out/app.apk
+            else
+              bash build_source_viewer.sh
+            fi
+          else
+            bash build_source_viewer.sh
+          fi
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: universal-apk
+          path: out/app.apk
+          if-no-files-found: error
